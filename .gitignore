@@ -1,0 +1,31 @@
+# --- Kompilacja C++ (pliki pośrednie) ---
+*.o
+*.obj
+*.d
+
+# --- Pliki wykonywalne (binarne) ---
+*.exe
+*.out
+*.app
+
+# Konkretne pliki binarne widoczne na obrazku (w folderze server)
+# Ważne: Musimy uważać, aby nie zignorować folderu "server/"
+server/server
+server/game_test
+
+# --- IDE i Edytory (VS Code) ---
+.vscode/
+# Jeśli chcesz współdzielić konfigurację VS Code z zespołem,
+# usuń linię ".vscode/" i zostaw tylko to, co prywatne.
+
+# --- Systemowe ---
+.DS_Store
+Thumbs.db
+
+# --- Folder Client (opcjonalnie) ---
+# Jeśli w folderze client jest projekt Node.js/Web:
+# client/node_modules/
+# client/dist/
+# client/.env
+
+test.cpp
