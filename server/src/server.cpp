@@ -51,7 +51,7 @@ void Server::run()
 	is_running = true;
 	std::cout << "Server listening on port " << port << "..." << std::endl;
 
-		while (is_running)
+	while (is_running)
 	{
 		sockaddr_in client_addr;
 		socklen_t client_len = sizeof(client_addr);
@@ -106,15 +106,23 @@ void Server::check_lobby()
 			lobby_clients.erase(lobby_clients.begin());
 		}
 
-		activeGame = new Game(players_for_game, 1000);
-		activeGame->setServer(this);
+		{
+			std::lock_guard<std::mutex> lock(gamePtrMutex);
+			activeGame = new Game(players_for_game, 1000);
+			activeGame->setServer(this);
+		}
 
 		std::thread gameThread([this]()
 							   {
-            this->activeGame->run();
-            delete this->activeGame;
-            this->activeGame = nullptr; });
+        this->activeGame->run();
+        
+        std::lock_guard<std::mutex> lock(this->gamePtrMutex);
+        delete this->activeGame;
+        this->activeGame = nullptr;
+        std::cout << "Game object deleted safely." << std::endl; });
+
 		gameThread.detach();
+		logger.log(LogLevel::INFO, "Game started with 3 players.");
 	}
 }
 
@@ -143,8 +151,20 @@ void Server::handleClientMessage(int playerId, std::string message)
 		ss >> amount;
 	}
 
-	if (activeGame)
+	std::lock_guard<std::mutex> lock(gamePtrMutex);
+
+	if (activeGame != nullptr)
 	{
 		activeGame->queueAction(playerId, command, amount);
 	}
+	else
+	{
+		logger.log(LogLevel::WARNING, "No active game to handle client message from Player: " + std::to_string(playerId));
+	}
+}
+
+void Server::stop()
+{
+	is_running = false;
+	close(server_socket_fd);
 }

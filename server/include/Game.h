@@ -23,7 +23,7 @@ struct PlayerAction
 class Game
 {
 private:
-    Server *server;
+    Server *server = nullptr;
     Board gameBoard;
     Logger logger;
 
@@ -31,7 +31,6 @@ private:
     std::queue<PlayerAction> actionQueue;
 
     int start_balance;
-    bool isWinner;
     std::vector<Player *> table_players;
     std::map<Player *, int> player_balance;
     std::vector<std::string> deck;
@@ -40,6 +39,8 @@ private:
     void bettingPhase(std::string phaseName);
     void processQueue();
     void determineWinner();
+    uint64_t parseCardToOMP(const std::string &cardStr);
+    void removeBankruptPlayers();
 
 public:
     Game(std::vector<Player *> players, int start_balance);
@@ -48,10 +49,7 @@ public:
     void playerBet(Player *p, int amount);
 
     void run();
-    void setServer(Server *srv)
-    {
-        this->server = srv;
-    }
+    void setServer(Server *srv);
     void queueAction(int playerId, const std::string &command, int amount);
 };
 

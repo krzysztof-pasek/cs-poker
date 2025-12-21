@@ -15,6 +15,7 @@ public:
     int getPot() const;
 
     void addToPot(int amount);
+
     void setBoardCard(int index, const std::string &card);
 
     void resetPot();

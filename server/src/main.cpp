@@ -5,7 +5,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        std::cout << "Użycie: ./poker_server <port>" << std::endl;
+        std::cout << "Użycie: ./server <port>" << std::endl;
         return 1;
     }
 

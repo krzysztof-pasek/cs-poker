@@ -5,7 +5,7 @@
 #include <string>
 #include <netinet/in.h>
 #include <mutex>
-#include "Logger.h"
+#include "./utils/Logger.h"
 
 class Game;
 class Player;
@@ -21,6 +21,8 @@ private:
     Logger logger;
 
     Game *activeGame;
+    std::mutex gamePtrMutex;
+
     void setup_socket();
     void clientHandler(int client_socket);
     void check_lobby();
@@ -29,6 +31,7 @@ public:
     Server(int port_num);
     ~Server();
     void run();
+    void stop();
     void sendMessageToPlayer(int player_id, const std::string &message);
     void sendMessageToAllPlayers(const std::vector<Player *> &players, const std::string &message);
     void handleClientMessage(int playerId, std::string message);

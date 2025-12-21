@@ -19,14 +19,6 @@ Deck::Deck() : logger()
 
     logger.log(LogLevel::INFO, "Deck initialized with 52 cards.");
 
-    int id = 0;
-    for (const auto &card : deck)
-    {
-        cardToIndex[card] = id++;
-    }
-
-    logger.log(LogLevel::INFO, "Deck mapped to indices.");
-
     std::random_device rd;
     std::mt19937 g(rd());
     std::shuffle(this->deck.begin(), this->deck.end(), g);
@@ -42,9 +34,4 @@ Deck::~Deck()
 const std::vector<std::string> &Deck::getDeck() const
 {
     return deck;
-}
-
-const std::map<std::string, int> &Deck::getIndicesMap() const
-{
-    return cardToIndex;
 }
