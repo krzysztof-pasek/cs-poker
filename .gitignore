@@ -22,10 +22,5 @@ server/game_test
 .DS_Store
 Thumbs.db
 
-# --- Folder Client (opcjonalnie) ---
-# Jeśli w folderze client jest projekt Node.js/Web:
-# client/node_modules/
-# client/dist/
-# client/.env
 
 test.cpp
