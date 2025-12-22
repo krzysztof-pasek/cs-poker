@@ -12,7 +12,7 @@
 #include <thread>
 #include <chrono>
 
-Game::Game(std::vector<Player *> players, int start_balance) : logger(), server(nullptr)
+Game::Game(std::vector<Player *> players, int start_balance) : server(nullptr)
 {
     this->start_balance = start_balance;
     this->table_players = players;
@@ -42,30 +42,15 @@ void Game::queueAction(int playerId, const std::string &command, int amount)
     actionQueue.push({playerId, command, amount});
 }
 
-void Game::playerBet(Player *p, int amount)
-{
-    if (p->getBalance() >= amount)
-    {
-        p->setBalance(p->getBalance() - amount);
-    }
-    else
-    {
-        if (server)
-        {
-            server->sendMessageToPlayer(p->getId(), "You don't have enough balance to bet that amount.\n");
-        }
-    }
-}
-
 void Game::bettingPhase(std::string phaseName)
 {
     if (server)
     {
         server->sendMessageToAllPlayers(table_players, "This is " + phaseName + " phase\n");
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         server->sendMessageToAllPlayers(table_players, "You have 20 seconds to enter \"BET + amount\" or \"FOLD\" \n");
-        std::this_thread::sleep_for(std::chrono::seconds(3));
+        // std::this_thread::sleep_for(std::chrono::seconds(3));
     };
 
     // for (Player *p : table_players)
@@ -110,8 +95,9 @@ void Game::processQueue()
         int playerId = action.playerId;
         std::string command = action.command;
         int amount = action.amount;
+
         logger.log(LogLevel::INFO, "Processing action from Player: " + std::to_string(playerId) + " Command: " + command + " Amount: " + std::to_string(amount));
-        if (amount <= 0)
+        if (amount <= 0 && command == "BET")
         {
             if (server)
                 server->sendMessageToPlayer(playerId, "Invalid chips amount\n");
@@ -126,6 +112,14 @@ void Game::processQueue()
                 p = player;
                 break;
             }
+        }
+
+        if (p->getStatus() == PlayerStatus::FOLDED)
+        {
+
+            if (server)
+                server->sendMessageToPlayer(playerId, "You have already folded\n");
+            continue;
         }
 
         if (command == "FOLD")
@@ -225,9 +219,16 @@ void Game::determineWinner()
     std::vector<Player *> winners;
     std::vector<std::string> boardCards = gameBoard.getBoardCards();
 
+    omp::HandEvaluator eval;
+    winners.clear();
+
     for (Player *p : activePlayers)
     {
-        omp::HandEvaluator eval;
+        if (p == nullptr)
+        {
+            logger.log(LogLevel::WARNING, "Znaleziono null pointer w activePlayers! Pomijam.\n");
+            continue;
+        }
         omp::Hand h = omp::Hand::empty();
         h += omp::Hand(parseCardToOMP(p->getCard1()));
         h += omp::Hand(parseCardToOMP(p->getCard2()));
@@ -301,7 +302,7 @@ void Game::run()
     while (table_players.size() > 1)
     {
         logger.log(LogLevel::INFO, "Starting a new round.");
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         Deck cardDeck;
         this->deck = cardDeck.getDeck();
@@ -336,7 +337,7 @@ void Game::run()
                 server->sendMessageToPlayer(p->getId(), "Paid entry fee - 10 chips\n");
         }
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         for (Player *p : table_players)
         {
@@ -351,7 +352,7 @@ void Game::run()
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         bettingPhase("PRE-FLOP");
 
@@ -428,7 +429,7 @@ void Game::run()
         determineWinner();
 
         removeBankruptPlayers();
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
     }
     if (server)
         server->sendMessageToAllPlayers(table_players, "Game Over! Not enough players.\n");

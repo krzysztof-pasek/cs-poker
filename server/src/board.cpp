@@ -1,4 +1,5 @@
 #include "Board.h"
+#include <stdexcept>
 
 Board::Board() : pot(0)
 {
@@ -25,10 +26,15 @@ void Board::addToPot(int amount)
 
 void Board::setBoardCard(int index, const std::string &card)
 {
-    if (index >= 0 && index < 5)
+    if (index < 0 || index >= 5)
     {
-        boardCards[index] = card;
+        throw std::runtime_error("Board card index out of range");
     }
+    if (boardCards.size() < 5)
+    {
+        boardCards.resize(5, "");
+    }
+    boardCards[index] = card;
 }
 
 void Board::resetPot()
