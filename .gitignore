@@ -22,5 +22,11 @@ server/game_test
 .DS_Store
 Thumbs.db
 
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
 test.cpp

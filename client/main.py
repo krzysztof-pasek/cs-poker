@@ -1,7 +1,8 @@
-import network
+import gui
+import tkinter as tk
 
-
-client = network.Client("127.0.0.1", 8080)
-print("Starting client...")
-client.run()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = gui.PokerGUI(root)
+    root.mainloop()
 
