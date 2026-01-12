@@ -1,13 +1,15 @@
 import tkinter as tk
+from tkinter import messagebox
 import re
 from network import Client
 import time
+import sys
 
 class PokerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Poker")
-        self.root.geometry("700x600")
+        self.root.geometry("700x650")
         self.root.configure(bg='white')
         
         self.hand_cards = []
@@ -23,12 +25,47 @@ class PokerGUI:
         
         self.client = None
         self.connected = False
+        self.player_name = "Gracz"
         
         self.create_ui()
-        self.auto_connect()
         self.process_messages()
         
     def create_ui(self):
+        name_frame = tk.Frame(self.root, bg='white', pady=5)
+        name_frame.pack()
+        
+        tk.Label(name_frame, text="Nazwa gracza:", bg='white', fg='black').pack(side=tk.LEFT, padx=5)
+        self.name_entry = tk.Entry(name_frame, width=15)
+        self.name_entry.insert(0, "Gracz")
+        self.name_entry.pack(side=tk.LEFT, padx=5)
+        self.name_entry.bind('<KeyRelease>', self.update_player_name)
+        
+        self.player_name_label = tk.Label(name_frame, text="Gracz", bg='white', fg='blue', 
+                                          font=('Arial', 12, 'bold'))
+        self.player_name_label.pack(side=tk.LEFT, padx=10)
+        
+        conn_frame = tk.Frame(self.root, bg='white', pady=10)
+        conn_frame.pack()
+        
+        tk.Label(conn_frame, text="Adres:", bg='white', fg='black').pack(side=tk.LEFT, padx=5)
+        self.server_entry = tk.Entry(conn_frame, width=15)
+        self.server_entry.insert(0, "127.0.0.1")
+        self.server_entry.pack(side=tk.LEFT, padx=5)
+        
+        tk.Label(conn_frame, text="Port:", bg='white', fg='black').pack(side=tk.LEFT, padx=5)
+        self.port_entry = tk.Entry(conn_frame, width=8)
+        self.port_entry.insert(0, "8080")
+        self.port_entry.pack(side=tk.LEFT, padx=5)
+        
+        self.connect_btn = tk.Button(conn_frame, text="Połącz", command=self.connect_to_server, 
+                                    bg='lightgreen', fg='black', font=('Arial', 10))
+        self.connect_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.disconnect_btn = tk.Button(conn_frame, text="Rozłącz", command=self.disconnect, 
+                                        bg='lightcoral', fg='black', font=('Arial', 10), 
+                                        state=tk.DISABLED)
+        self.disconnect_btn.pack(side=tk.LEFT, padx=5)
+        
         self.timer_label = tk.Label(self.root, text="Timer: --", bg='white', 
                                     fg='black', font=('Arial', 20, 'bold'))
         self.timer_label.pack(pady=10)
@@ -84,11 +121,60 @@ class PokerGUI:
                                  font=('Arial', 11))
         self.fold_btn.pack(side=tk.LEFT, padx=5)
         
-    def auto_connect(self):
-        self.client = Client("127.0.0.1", 8080)
-        if self.client.connect():
-            self.connected = True
+    def connect_to_server(self):
+        if self.connected:
+            return
             
+        try:
+            server_address = self.server_entry.get()
+            server_port = int(self.port_entry.get())
+            
+            self.client = Client(server_address, server_port)
+            if self.client.connect():
+                self.connected = True
+                player_name = self.name_entry.get().strip()
+                if not player_name:
+                    player_name = "Gracz"
+                self.client.send_message(f"NAME:{player_name}")
+                self.connect_btn.config(state=tk.DISABLED)
+                self.disconnect_btn.config(state=tk.NORMAL)
+                self.server_entry.config(state=tk.DISABLED)
+                self.port_entry.config(state=tk.DISABLED)
+                self.name_entry.config(state=tk.DISABLED)
+                self.status_label.config(text="Połączono", fg='green')
+            else:
+                messagebox.showerror("Błąd", f"Nie można połączyć z {server_address}:{server_port}")
+        except ValueError:
+            messagebox.showerror("Błąd", "Nieprawidłowy port")
+        except Exception as e:
+            messagebox.showerror("Błąd", f"Błąd połączenia: {e}")
+            
+    def update_player_name(self, event=None):
+        name = self.name_entry.get().strip()
+        if name:
+            self.player_name = name
+            self.player_name_label.config(text=name)
+        else:
+            self.player_name = "Gracz"
+            self.player_name_label.config(text="Gracz")
+        
+    def disconnect(self):
+        if not self.connected:
+            return
+            
+        if self.client:
+            self.client.stop()
+        self.connected = False
+        self.connect_btn.config(state=tk.NORMAL)
+        self.disconnect_btn.config(state=tk.DISABLED)
+        self.server_entry.config(state=tk.NORMAL)
+        self.port_entry.config(state=tk.NORMAL)
+        self.name_entry.config(state=tk.NORMAL)
+        self.bet_btn.config(state=tk.DISABLED)
+        self.fold_btn.config(state=tk.DISABLED)
+        self.status_label.config(text="Rozłączono", fg='red')
+        self.stop_timer()
+        
     def place_bet(self):
         if not self.connected or self.folded:
             return
@@ -96,6 +182,7 @@ class PokerGUI:
             amount = int(self.bet_entry.get())
             if amount > 0:
                 self.client.send_message(f"BET {amount}")
+                self.bet_entry.delete(0, tk.END)
         except:
             pass
             
@@ -235,6 +322,9 @@ class PokerGUI:
         self.root.after(100, self.process_messages)
         
     def handle_message(self, msg):
+        if not self.connected:
+            return
+            
         match = re.search(r'Your cards: (\w+)\s+(\w+)', msg)
         if match:
             self.hand_cards = [match.group(1), match.group(2)]
@@ -254,19 +344,14 @@ class PokerGUI:
             
         match = re.search(r'Pot value: (\d+)', msg)
         if match:
-            new_pot = int(match.group(1))
-            pot_increase = new_pot - self.pot
-            self.pot = new_pot
-            
-            if pot_increase > 0 and not self.folded:
-                pass
-                
+            self.pot = int(match.group(1))
             self.update_info_display()
             
         match = re.search(r'Bet accepted: (\d+)', msg)
         if match:
             bet_amount = int(match.group(1))
             self.my_bet += bet_amount
+            self.balance -= bet_amount
             if self.my_bet > self.highest_bet:
                 self.highest_bet = self.my_bet
             self.update_info_display()
@@ -278,19 +363,47 @@ class PokerGUI:
             if new_highest > self.highest_bet:
                 self.highest_bet = new_highest
             self.update_info_display()
+            
+        if 'has been eliminated' in msg:
+            match = re.search(r'Player (\d+)', msg)
+            if match:
+                self.status_label.config(text=f"Gracz {match.group(1)} został wyeliminowany - sprawdzanie zwycięzcy...", fg='orange')
+                
+        if 'disconnected' in msg.lower() or 'close' in msg.lower():
+            self.status_label.config(text="Gracz rozłączył się - sprawdzanie zwycięzcy...", fg='orange')
+            
+        if 'folded' in msg.lower() and 'Player' in msg and 'wins' not in msg.lower() and 'You' not in msg:
+            match = re.search(r'Player (\d+)', msg)
+            if match:
+                self.status_label.config(text=f"Gracz {match.group(1)} spasował - sprawdzanie zwycięzcy...", fg='orange')
                 
         if 'Paid entry fee' in msg:
             self.my_bet = 10
             self.highest_bet = 10
+            self.balance -= 10
             if self.pot == 0:
                 self.pot = 30
             self.update_info_display()
+            
+        if 'You dont have that much chips' in msg or 'Try again' in msg:
+            self.status_label.config(text="Brak wystarczających środków!", fg='red')
+            self.root.after(3000, lambda: self.status_label.config(text="") if not self.folded else None)
             
         if 'You folded' in msg:
             self.folded = True
             self.bet_btn.config(state=tk.DISABLED)
             self.fold_btn.config(state=tk.DISABLED)
             self.status_label.config(text="SPASOWAŁEŚ - Obserwujesz grę")
+            
+        if 'You are bankrupt' in msg:
+            self.status_label.config(text="Jesteś bankrutem - Obserwujesz grę", fg='orange')
+            self.folded = True
+            self.bet_btn.config(state=tk.DISABLED)
+            self.fold_btn.config(state=tk.DISABLED)
+            
+        if 'Game Over' in msg or 'Not enough players' in msg:
+            self.status_label.config(text="Gra zakończona", fg='red')
+            self.root.after(2000, self.quit_app)
             
         if '20 seconds' in msg and not self.folded:
             self.start_timer(20)
@@ -299,7 +412,11 @@ class PokerGUI:
         if match:
             player_id = match.group(1)
             pot_amount = match.group(2)
-            self.winner_label.config(text=f"Gracz {player_id} wygrywa pulę: {pot_amount} żetonów!")
+            winner_text = f"Gracz {player_id} wygrywa pulę: {pot_amount} żetonów!"
+            if 'folded' in msg.lower() or 'disconnect' in msg.lower():
+                winner_text += " (Pozostali gracze spasowali/rozłączyli się)"
+            self.winner_label.config(text=winner_text, fg='green')
+            self.status_label.config(text="Runda zakończona!", fg='green')
             
         match = re.search(r'Winner by showdown: Player (\d+)', msg)
         if match:
@@ -325,6 +442,7 @@ class PokerGUI:
             self.hand_cards = []
             self.my_bet = 0
             self.highest_bet = 0
+            self.pot = 0
             self.folded = False
             self.status_label.config(text="")
             self.winner_label.config(text="")
@@ -333,6 +451,12 @@ class PokerGUI:
             
         if 'wins' in msg.lower() or 'Game Over' in msg:
             self.stop_timer()
+            
+    def quit_app(self):
+        if self.client:
+            self.client.stop()
+        self.root.quit()
+        sys.exit()
 
 def main():
     root = tk.Tk()

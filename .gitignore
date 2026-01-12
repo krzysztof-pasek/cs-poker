@@ -1,28 +1,24 @@
-# --- Kompilacja C++ (pliki pośrednie) ---
+
 *.o
 *.obj
 *.d
 
-# --- Pliki wykonywalne (binarne) ---
+
 *.exe
 *.out
 *.app
 
-# Konkretne pliki binarne widoczne na obrazku (w folderze server)
-# Ważne: Musimy uważać, aby nie zignorować folderu "server/"
 server/server
 server/game_test
 
-# --- IDE i Edytory (VS Code) ---
-.vscode/
-# Jeśli chcesz współdzielić konfigurację VS Code z zespołem,
-# usuń linię ".vscode/" i zostaw tylko to, co prywatne.
 
-# --- Systemowe ---
+.vscode/
+
+
 .DS_Store
 Thumbs.db
 
-# --- Python ---
+
 __pycache__/
 *.py[cod]
 *$py.class
