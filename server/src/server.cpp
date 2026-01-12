@@ -9,8 +9,11 @@
 #include <thread>
 #include <string.h>
 
+#include <signal.h>
+
 Server::Server(int port_num) : port(port_num), is_running(false), logger(), activeGame(nullptr)
 {
+	signal(SIGPIPE, SIG_IGN);
 	server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (server_socket_fd == -1)
 	{
@@ -79,6 +82,7 @@ void Server::clientHandler(int client_socket)
 	while (true)
 	{
 		memset(buffer, 0, 1024);
+
 		int bytes_read = recv(client_socket, buffer, 1024, 0);
 		if (bytes_read <= 0)
 		{
