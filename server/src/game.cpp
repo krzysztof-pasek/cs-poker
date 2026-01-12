@@ -283,9 +283,8 @@ void Game::removeBankruptPlayers()
         {
             if (server)
             {
-                server->sendMessageToPlayer((*p)->getId(), "You are bankrupt. Disconnecting.\n");
-                server->sendMessageToAllPlayers(table_players, "Player " + std::to_string((*p)->getId()) + " has been eliminated from the game.\n");
-                server->stop();
+                server->sendMessageToPlayer((*p)->getId(), "You are bankrupt. Goodbye.\n");
+                server->sendMessageToAllPlayers(table_players, "Player " + std::to_string((*p)->getId()) + " has been eliminated.\n");
             }
             logger.log(LogLevel::INFO, "Player eliminated: " + std::to_string((*p)->getId()));
             p = table_players.erase(p);
