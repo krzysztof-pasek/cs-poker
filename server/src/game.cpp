@@ -17,8 +17,6 @@ Game::Game(std::vector<Player *> players, int start_balance) : server(nullptr)
     this->start_balance = start_balance;
     this->table_players = players;
 
-    Board gameBoard;
-
     for (Player *p : players)
     {
         p->setBalance(start_balance);
@@ -29,6 +27,17 @@ Game::Game(std::vector<Player *> players, int start_balance) : server(nullptr)
 
 Game::~Game()
 {
+}
+
+bool Game::isPlayerInGame(int playerId)
+{
+    std::lock_guard<std::mutex> lock(gameMutex);
+    for (Player *p : table_players)
+    {
+        if (p->getId() == playerId)
+            return true;
+    }
+    return false;
 }
 
 void Game::setServer(Server *srv)
@@ -50,13 +59,7 @@ void Game::bettingPhase(std::string phaseName)
         std::this_thread::sleep_for(std::chrono::seconds(2));
 
         server->sendMessageToAllPlayers(table_players, "You have 20 seconds to enter \"BET + amount\" or \"FOLD\" \n");
-        // std::this_thread::sleep_for(std::chrono::seconds(3));
     };
-
-    // for (Player *p : table_players)
-    // {
-    //     p->setCurrentBet(0);
-    // }
 
     {
         std::lock_guard<std::mutex> lock(gameMutex);
@@ -114,6 +117,19 @@ void Game::processQueue()
             }
         }
 
+        if (p == nullptr)
+        {
+            logger.log(LogLevel::WARNING, "Action from unknown/removed player ID: " + std::to_string(playerId));
+            continue;
+        }
+
+        if (p->getStatus() == PlayerStatus::ALL_IN)
+        {
+            if (server)
+                server->sendMessageToPlayer(playerId, "You are ALL-IN, wait for showdown.\n");
+            continue;
+        }
+
         if (p->getStatus() == PlayerStatus::FOLDED)
         {
 
@@ -135,6 +151,13 @@ void Game::processQueue()
                 p->setCurrentBet(p->getCurrentBet() + amount);
                 p->setBalance(p->getBalance() - amount);
                 gameBoard.addToPot(amount);
+
+                if (p->getBalance() == 0)
+                {
+                    p->setStatus(PlayerStatus::ALL_IN);
+                    if (server)
+                        server->sendMessageToPlayer(playerId, "You are now ALL-IN.\n");
+                }
 
                 if (server)
                 {
@@ -161,39 +184,44 @@ uint64_t Game::parseCardToOMP(const std::string &cardStr)
     if (cardStr.length() < 2)
         return 0;
 
+    char suitChar = cardStr.back();
     char rankChar = cardStr[0];
-    char suitChar = cardStr[1];
 
     int rank = 0;
-    if (isdigit(rankChar))
+    if (rankChar == '1' && cardStr.length() == 3)
+    {
+        rank = 8;
+    }
+    else if (isdigit(rankChar))
+    {
         rank = (rankChar - '0') - 2;
+    }
     else
     {
-        if (rankChar == 'T')
+        if (rankChar == 'T' || rankChar == 't')
             rank = 8;
-        if (rankChar == 'J')
+        if (rankChar == 'J' || rankChar == 'j')
             rank = 9;
-        if (rankChar == 'Q')
+        if (rankChar == 'Q' || rankChar == 'q')
             rank = 10;
-        if (rankChar == 'K')
+        if (rankChar == 'K' || rankChar == 'k')
             rank = 11;
-        if (rankChar == 'A')
+        if (rankChar == 'A' || rankChar == 'a')
             rank = 12;
     }
 
     int suit = 0;
-    if (suitChar == 'h')
+    if (suitChar == 'h' || suitChar == 'H')
         suit = 0;
-    if (suitChar == 'd')
+    if (suitChar == 'd' || suitChar == 'D')
         suit = 1;
-    if (suitChar == 'c')
+    if (suitChar == 'c' || suitChar == 'C')
         suit = 2;
-    if (suitChar == 's')
+    if (suitChar == 's' || suitChar == 'S')
         suit = 3;
 
     return 4 * rank + suit;
 }
-
 void Game::determineWinner()
 {
     std::vector<Player *> activePlayers;
@@ -219,7 +247,7 @@ void Game::determineWinner()
     std::vector<Player *> winners;
     std::vector<std::string> boardCards = gameBoard.getBoardCards();
 
-    omp::HandEvaluator eval;
+    static omp::HandEvaluator eval;
     winners.clear();
 
     for (Player *p : activePlayers)
@@ -276,17 +304,24 @@ void Game::determineWinner()
 
 void Game::removeBankruptPlayers()
 {
+    std::lock_guard<std::mutex> lock(gameMutex);
+
     auto p = table_players.begin();
     while (p != table_players.end())
     {
         if ((*p)->getBalance() <= 0)
         {
+            std::vector<Player *> broadcastList = table_players;
+
             if (server)
             {
                 server->sendMessageToPlayer((*p)->getId(), "You are bankrupt. Goodbye.\n");
-                server->sendMessageToAllPlayers(table_players, "Player " + std::to_string((*p)->getId()) + " has been eliminated.\n");
+                server->sendMessageToAllPlayers(broadcastList, "Player " + std::to_string((*p)->getId()) + " has been eliminated.\n");
             }
+
             logger.log(LogLevel::INFO, "Player eliminated: " + std::to_string((*p)->getId()));
+
+            delete *p;
             p = table_players.erase(p);
         }
         else
@@ -325,15 +360,18 @@ void Game::run()
             {
                 int currBalance = p->getBalance();
                 p->setBalance(0);
-                gameBoard.addToPot(p->getBalance());
+                gameBoard.addToPot(currBalance);
                 p->setStatus(PlayerStatus::ALL_IN);
                 if (server)
                     server->sendMessageToPlayer(p->getId(), "Paid " + std::to_string(currBalance) + " chips, your current balance is 0\n");
             }
-            p->setBalance(p->getBalance() - 10);
-            gameBoard.addToPot(10);
-            if (server)
-                server->sendMessageToPlayer(p->getId(), "Paid entry fee - 10 chips\n");
+            else
+            {
+                p->setBalance(p->getBalance() - 10);
+                gameBoard.addToPot(10);
+                if (server)
+                    server->sendMessageToPlayer(p->getId(), "Paid entry fee - 10 chips\n");
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(2));

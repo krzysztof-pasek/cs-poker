@@ -367,15 +367,15 @@ class PokerGUI:
         if 'has been eliminated' in msg:
             match = re.search(r'Player (\d+)', msg)
             if match:
-                self.status_label.config(text=f"Gracz {match.group(1)} został wyeliminowany - sprawdzanie zwycięzcy...", fg='orange')
+                self.status_label.config(text=f"Gracz {match.group(1)} został wyeliminowany", fg='orange')
                 
         if 'disconnected' in msg.lower() or 'close' in msg.lower():
-            self.status_label.config(text="Gracz rozłączył się - sprawdzanie zwycięzcy...", fg='orange')
+            self.status_label.config(text="Gracz rozłączył się", fg='orange')
             
         if 'folded' in msg.lower() and 'Player' in msg and 'wins' not in msg.lower() and 'You' not in msg:
             match = re.search(r'Player (\d+)', msg)
             if match:
-                self.status_label.config(text=f"Gracz {match.group(1)} spasował - sprawdzanie zwycięzcy...", fg='orange')
+                self.status_label.config(text=f"Gracz {match.group(1)} spasował", fg='orange')
                 
         if 'Paid entry fee' in msg:
             self.my_bet = 10

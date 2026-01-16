@@ -20,8 +20,11 @@ private:
     std::mutex lobbyMutex;
     Logger logger;
 
-    Game *activeGame;
-    std::mutex gamePtrMutex;
+    // Game *activeGame;
+    std::vector<Game *> activeGames;
+
+    // std::mutex gamePtrMutex;
+    std::mutex gamesMutex;
 
     void setup_socket();
     void clientHandler(int client_socket);

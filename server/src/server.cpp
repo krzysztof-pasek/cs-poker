@@ -8,10 +8,11 @@
 #include <sstream>
 #include <thread>
 #include <string.h>
-
+#include <algorithm>
+#include <vector>
 #include <signal.h>
 
-Server::Server(int port_num) : port(port_num), is_running(false), logger(), activeGame(nullptr)
+Server::Server(int port_num) : port(port_num), is_running(false), logger()
 {
 	signal(SIGPIPE, SIG_IGN);
 	server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -98,7 +99,8 @@ void Server::clientHandler(int client_socket)
 void Server::check_lobby()
 {
 	std::lock_guard<std::mutex> lock(lobbyMutex);
-	if (lobby_clients.size() >= 3 && activeGame == nullptr)
+
+	while (lobby_clients.size() >= 3)
 	{
 		logger.log(LogLevel::INFO, "Creating new game with 3 players.");
 		std::vector<Player *> players_for_game;
@@ -110,20 +112,28 @@ void Server::check_lobby()
 			lobby_clients.erase(lobby_clients.begin());
 		}
 
+		Game *newGame = new Game(players_for_game, 1000);
+		newGame->setServer(this);
+
 		{
-			std::lock_guard<std::mutex> lock(gamePtrMutex);
-			activeGame = new Game(players_for_game, 1000);
-			activeGame->setServer(this);
+			std::lock_guard<std::mutex> lock(gamesMutex);
+			activeGames.push_back(newGame);
 		}
 
-		std::thread gameThread([this]()
+		std::thread gameThread([this, newGame]()
 							   {
-        this->activeGame->run();
-        
-        std::lock_guard<std::mutex> lock(this->gamePtrMutex);
-        delete this->activeGame;
-        this->activeGame = nullptr;
-        std::cout << "Game object deleted safely." << std::endl; });
+            newGame->run();
+            
+            {
+                std::lock_guard<std::mutex> lock(this->gamesMutex);
+                auto it = std::find(this->activeGames.begin(), this->activeGames.end(), newGame);
+                if (it != this->activeGames.end()) {
+                    this->activeGames.erase(it);
+                }
+            }
+            
+            delete newGame;
+            std::cout << "Game object deleted safely." << std::endl; });
 
 		gameThread.detach();
 		logger.log(LogLevel::INFO, "Game started with 3 players.");
@@ -155,15 +165,23 @@ void Server::handleClientMessage(int playerId, std::string message)
 		ss >> amount;
 	}
 
-	std::lock_guard<std::mutex> lock(gamePtrMutex);
+	std::lock_guard<std::mutex> lock(gamesMutex);
 
-	if (activeGame != nullptr)
+	bool gameFound = false;
+
+	for (Game *game : activeGames)
 	{
-		activeGame->queueAction(playerId, command, amount);
+		if (game->isPlayerInGame(playerId))
+		{
+			game->queueAction(playerId, command, amount);
+			gameFound = true;
+			break;
+		}
 	}
-	else
+
+	if (!gameFound)
 	{
-		logger.log(LogLevel::WARNING, "No active game to handle client message from Player: " + std::to_string(playerId));
+		logger.log(LogLevel::WARNING, "Player " + std::to_string(playerId) + " sent message but is not in any active game.");
 	}
 }
 

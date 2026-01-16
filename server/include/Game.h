@@ -48,6 +48,8 @@ public:
 
     void playerBet(Player *p, int amount);
 
+    bool isPlayerInGame(int playerId);
+
     void run();
     void setServer(Server *srv);
     void queueAction(int playerId, const std::string &command, int amount);
