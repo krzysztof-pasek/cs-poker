@@ -76,6 +76,7 @@ void Server::clientHandler(int client_socket)
 	{
 		std::lock_guard<std::mutex> lock(lobbyMutex);
 		lobby_clients.push_back(client_socket);
+		sendMessageToPlayer(client_socket, "You are Player " + std::to_string(client_socket) + "\n");
 	}
 	check_lobby();
 

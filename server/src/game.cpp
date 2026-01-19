@@ -386,6 +386,7 @@ void Game::run()
             {
                 server->sendMessageToPlayer(p->getId(), "Your cards: " + p->getCard1() + " " + p->getCard2() + "\n");
                 server->sendMessageToPlayer(p->getId(), "Balance: " + std::to_string(p->getBalance()) + "\n");
+                server->sendMessageToPlayer(p->getId(), "You are Player " + std::to_string(p->getId()) + "\n");
             }
         }
 

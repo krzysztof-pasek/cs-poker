@@ -34,13 +34,8 @@ class PokerGUI:
         name_frame = tk.Frame(self.root, bg='white', pady=5)
         name_frame.pack()
         
-        tk.Label(name_frame, text="Nazwa gracza:", bg='white', fg='black').pack(side=tk.LEFT, padx=5)
-        self.name_entry = tk.Entry(name_frame, width=15)
-        self.name_entry.insert(0, "Gracz")
-        self.name_entry.pack(side=tk.LEFT, padx=5)
-        self.name_entry.bind('<KeyRelease>', self.update_player_name)
-        
-        self.player_name_label = tk.Label(name_frame, text="Gracz", bg='white', fg='blue', 
+        tk.Label(name_frame, text="Twój identyfikator:", bg='white', fg='black').pack(side=tk.LEFT, padx=5)
+        self.player_name_label = tk.Label(name_frame, text="Gracz", bg='white', fg='blue',
                                           font=('Arial', 12, 'bold'))
         self.player_name_label.pack(side=tk.LEFT, padx=10)
         
@@ -132,15 +127,10 @@ class PokerGUI:
             self.client = Client(server_address, server_port)
             if self.client.connect():
                 self.connected = True
-                player_name = self.name_entry.get().strip()
-                if not player_name:
-                    player_name = "Gracz"
-                self.client.send_message(f"NAME:{player_name}")
                 self.connect_btn.config(state=tk.DISABLED)
                 self.disconnect_btn.config(state=tk.NORMAL)
                 self.server_entry.config(state=tk.DISABLED)
                 self.port_entry.config(state=tk.DISABLED)
-                self.name_entry.config(state=tk.DISABLED)
                 self.status_label.config(text="Połączono", fg='green')
             else:
                 messagebox.showerror("Błąd", f"Nie można połączyć z {server_address}:{server_port}")
@@ -149,15 +139,6 @@ class PokerGUI:
         except Exception as e:
             messagebox.showerror("Błąd", f"Błąd połączenia: {e}")
             
-    def update_player_name(self, event=None):
-        name = self.name_entry.get().strip()
-        if name:
-            self.player_name = name
-            self.player_name_label.config(text=name)
-        else:
-            self.player_name = "Gracz"
-            self.player_name_label.config(text="Gracz")
-        
     def disconnect(self):
         if not self.connected:
             return
@@ -169,7 +150,6 @@ class PokerGUI:
         self.disconnect_btn.config(state=tk.DISABLED)
         self.server_entry.config(state=tk.NORMAL)
         self.port_entry.config(state=tk.NORMAL)
-        self.name_entry.config(state=tk.NORMAL)
         self.bet_btn.config(state=tk.DISABLED)
         self.fold_btn.config(state=tk.DISABLED)
         self.status_label.config(text="Rozłączono", fg='red')
@@ -325,6 +305,12 @@ class PokerGUI:
         if not self.connected:
             return
             
+        match = re.search(r'You are Player (\d+)', msg)
+        if match:
+            player_id = match.group(1)
+            self.player_name = f"Player {player_id}"
+            self.player_name_label.config(text=self.player_name)
+        
         match = re.search(r'Your cards: (\w+)\s+(\w+)', msg)
         if match:
             self.hand_cards = [match.group(1), match.group(2)]
